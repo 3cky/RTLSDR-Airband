@@ -85,6 +85,18 @@ static int mirisdr_find_device_by_serial(char const * const s) {
 	return -1;
 }
 
+void mirisdr_set_sfmt(input_t * const input, const char *sfmt) {
+	if (!strcmp(sfmt, "504_S8")) {
+		input->sfmt = SFMT_S8;
+		input->bytes_per_sample = sizeof(char);
+		input->fullscale = (float)SCHAR_MAX - 0.5f;
+	} else {
+		input->sfmt = SFMT_S16;
+		input->bytes_per_sample = sizeof(short);
+		input->fullscale = (float)SHRT_MAX - 0.5f;
+	}
+}
+
 int mirisdr_init(input_t * const input) {
 	mirisdr_dev_data_t *dev_data = (mirisdr_dev_data_t *)input->dev_data;
 	if(dev_data->serial != NULL) {
@@ -132,11 +144,15 @@ int mirisdr_init(input_t * const input) {
 		log(LOG_INFO, "Device #%d: gain set to %d dB\n", dev_data->index,
 			mirisdr_get_tuner_gain(miri));
 	}
-	r = mirisdr_set_sample_format(miri, (char *)"504_S8");
+	r = mirisdr_set_sample_format(miri, dev_data->sample_format);
 	if (r < 0) {
-		log(LOG_ERR, "Failed to set sample format for device #%d: error %d\n", dev_data->index, r);
+		log(LOG_ERR, "Failed to set sample format %s for device #%d: error %d\n", 
+			dev_data->sample_format, dev_data->index, r);
 		error();
 	}
+	const char *sfmt = mirisdr_get_sample_format(miri);
+	log(LOG_INFO, "Device #%d: sample format set to %s\n", dev_data->index, sfmt);
+	mirisdr_set_sfmt(input, sfmt);
 	mirisdr_reset_buffer(miri);
 	log(LOG_INFO, "MiriSDR device %d initialized\n", dev_data->index);
 	return 0;
@@ -204,6 +220,9 @@ int mirisdr_parse_config(input_t * const input, libconfig::Setting &cfg) {
 			error();
 		}
 	}
+	if (cfg.exists("sample_format")) {
+		dev_data->sample_format = strdup(cfg["sample_format"]);
+	}
 	return 0;
 }
 
@@ -211,6 +230,7 @@ MODULE_EXPORT input_t *mirisdr_input_new() {
 	mirisdr_dev_data_t *dev_data = (mirisdr_dev_data_t *)XCALLOC(1, sizeof(mirisdr_dev_data_t));
 	dev_data->index = -1;	// invalid default receiver index
 	dev_data->gain = -1;	// invalid default gain value
+	dev_data->sample_format = (char *)"504_S8";
 	dev_data->bufcnt = MIRISDR_DEFAULT_LIBUSB_BUFFER_COUNT;
 /*	return &( input_t ){
 		.dev_data = dev_data,

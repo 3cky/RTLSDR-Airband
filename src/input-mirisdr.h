@@ -29,4 +29,5 @@ typedef struct {
 	int correction;		// correction in Hertz (PPM correction is not supported by libmirisdr)
 	int gain;		// gain in dB
 	int bufcnt;		// libusb buffer count
+	char *sample_format; // libmirisdr sample format
 } mirisdr_dev_data_t;
